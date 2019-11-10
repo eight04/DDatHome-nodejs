@@ -26,7 +26,7 @@ function startDD({
   analytics = false,
   nickname,
   parallel = 120,
-  interval = 60,
+  interval = 60000,
   _log = console.log,
   _info = verbose ? _log : () => {}
 }) {
@@ -53,7 +53,7 @@ ${'D'.repeat(stdoutColumns)}`);
   
   const limitedGot = limitCall(
     got,
-    parallel * 2,
+    parallel,
     interval
   );
   const ws = new PWS(url, undefined, WebSocket, {
@@ -63,6 +63,9 @@ ${'D'.repeat(stdoutColumns)}`);
     got: limitedGot,
     _info
   });
+  let done = 0;
+  let pendingPulls = 0;
+  const startTime = Date.now();
   
   ws.on('open', () => {
     _info('Connected');
@@ -70,6 +73,7 @@ ${'D'.repeat(stdoutColumns)}`);
   
   ws.on('close', () => {
     _info('Disconnected');
+    pendingPulls = 0;
   });
   
   ws.on('message', async message => {
@@ -81,23 +85,34 @@ ${'D'.repeat(stdoutColumns)}`);
       return;
     }
     
+    // FIXME: should we consider the invalid message as a valid pull?
+    if (pendingPulls) {
+      pendingPulls--;
+    }
+    
     let response;
     try {
       response = await processor(data);
     } catch (err) {
       // FIXME: what is the correct way to reject a job?
       response = err.message;
+      _info('Processor error');
+      _info(err);
     }
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({key, data: response}));
+      _info(`Job completes. Efficiency=${Math.floor((Date.now() - startTime) / ++done)}ms per task`);
     } else {
       _info('Offline, a job is discarded');
     }
   });
   
-  setInterval(pullTasks, interval);
+  ws.once('open', () => {
+    setInterval(pullTask, interval);
+    pullTask();
+  });
   
-  function pullTasks() {
+  function pullTask() {
     // add random delay to each task
     // FIXME: why do we need this?
     for (let i = 0; i < parallel; i++) {
@@ -106,11 +121,16 @@ ${'D'.repeat(stdoutColumns)}`);
   }
   
   function doPull() {
-    if (ws.readyState === 1) {
-      ws.send('DDhttp');
-    } else {
-      _info('Offline, cannot pull a job');
+    if (pendingPulls >= parallel) {
+      _info(`${pendingPulls} pending pulls. Cannot pull a job`);
+      return;
     }
+    if (ws.readyState !== 1) {
+      _info('Offline. Cannot pull a job');
+      return;
+    }
+    ws.send('DDhttp');
+    pendingPulls++;
   }
 }
 

@@ -21,5 +21,6 @@ require(".").startDD({
   stdoutColumns: process.stdout.columns,
   analytics: !args['--no-analytics'],
   nickname: args['--nickname'],
+  interval: args['--interval'],
   parallel: args['--parallel']
 });
