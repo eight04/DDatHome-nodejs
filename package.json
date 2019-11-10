@@ -3,10 +3,17 @@
   "name": "ddatnodejs",
   "version": "1.2.0",
   "scripts": {
-    "start": "node index.js"
+    "start": "node cli",
+    "start-dev": "node cli --url ws://0.0.0.0:9013",
+    "test": "eslint \"**/*.js\""
   },
   "dependencies": {
     "got": "^9.6.0",
+    "pws": "^4.1.2",
     "ws": "^7.1.2"
+  },
+  "devDependencies": {
+    "eslint": "^6.6.0",
+    "neodoc": "^2.0.2"
   }
 }
